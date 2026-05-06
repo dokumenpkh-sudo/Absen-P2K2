@@ -10,7 +10,6 @@
     <meta name="apple-mobile-web-app-title" content="Absen PKH">
     <title>Absen Digital P2K2 PKH</title>
     <style>
-        /* (masukkan semua kode CSS dari versi final di sini - karena panjang, saya akan tulis ringkas, tapi Anda bisa copy dari kode sebelumnya) */
         * { box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -87,7 +86,7 @@
             flex-wrap: wrap;
             font-weight: bold;
         }
-        .table-wrapper { overflow-x: auto; background: white; border-radius: 12px; padding: 0 0 1px 0; }
+        .table-wrapper { overflow-x: auto; background: white; border-radius: 12px; padding: 0 0 1px 0; margin-bottom:20px; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         th { background: #2a5298; color: white; padding: 12px 8px; }
         td { padding: 10px 8px; border-bottom: 1px solid #ddd; }
@@ -162,7 +161,7 @@
     <div class="card">
         <div class="toolbar">
             <div><button id="simpanBtn" class="btn-success">💾 Simpan Absen</button> <button id="resetBtn" class="btn-warning">🔄 Reset ke HADIR</button> <button id="devBtn" class="btn-dev">🔧 Menu Pengembang</button></div>
-            <div><label>📎 Export ke:</label> <select id="exportFormat"><option value="pdf">PDF (F4)</option><option value="word">Word (DOC)</option><option value="excel">Excel (CSV)</option></select> <button id="exportBtn" class="btn-primary">▶ Export</button></div>
+            <div><label>📎 Export ke:</label> <select id="exportFormat"><option value="pdf">PDF (F4)</option><option value="word">Word (DOC)</option><option value="excel">Excel (CSV)</option></select> <button id="exportBtn" class="btn-primary">▶ Export Laporan</button></div>
         </div>
     </div>
     <!-- SUMMARY -->
@@ -215,8 +214,10 @@
         </div>
         <hr>
         <div class="flex-row">
-            <div class="flex-group"><button id="exportDataBtn" class="btn-success">📥 Export Backup (JSON)</button></div>
-            <div class="flex-group"><input type="file" id="importFile" accept=".json" style="display:none;"><button id="importDataBtn" class="btn-warning">📤 Import Backup</button></div>
+            <div class="flex-group"><button id="exportMasterBtn" class="btn-success">📎 Export Master (Excel CSV)</button></div>
+            <div class="flex-group"><input type="file" id="importMasterFile" accept=".csv" style="display:none;"><button id="importMasterBtn" class="btn-warning">📤 Import Master (Excel CSV)</button></div>
+            <div class="flex-group"><button id="exportFullBtn" class="btn-primary">💾 Export Full Backup (JSON)</button></div>
+            <div class="flex-group"><input type="file" id="importFullFile" accept=".json" style="display:none;"><button id="importFullBtn" class="btn-primary">📂 Import Full Backup</button></div>
             <div class="flex-group"><button id="lockDevBtn" class="btn-danger">🔒 Kunci Kembali & Tutup</button></div>
         </div>
         <div id="importMsg" style="margin-top:10px; display:none;" class="btn-success"></div>
@@ -227,7 +228,7 @@
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
-    // ==================== DATA DEFAULT (SAMA SEPERTI VERSI SEBELUMNYA) ====================
+    // ==================== DATA DEFAULT (15 KELOMPOK SESUAI LAPORAN) ====================
     const defaultKelompokData = {
         "Joketro 1": ["TUTIK","PUJI PURYANI","LILIK MISWANTI","BOIRAN","BIBIT","SNIYAH","SUKINI","SARDI","MARTINI","SUPINI","JEMIATUN","YANI","PAIMIN M","SITUN KHOLIPAH","SUMIATI","MISIRAH","PRIHATIN"],
         "Joketro 2": ["SITI AMINAH","SRI WINARTI","PUJI ASTUTI","JUMITUN","SUPRIHATIN","AHMAT","SENEN","BONARI","SULASIH","POINEM","ERMAWATI","WONI","HARYANTO","WIIWIK FETIANA","ELA INDRIANI","MISKIYEM","KARIYEM","KATIJO"],
@@ -246,7 +247,6 @@
         "Sukorejo 2": ["SATINI","MISNGATUN","YULIANI","YULIANI","JAMILAH","SOIJAH","SRI UTAMI","TUTIK","JUMIATIN","SAMINEM","MISKIRAH","PAIKAN","SOIYAH","TASMI","YUNIARSIH","MUSIFAH","WINDA DWININGRUM","MISKIYEM","JIMAH"]
     };
 
-    // Konfigurasi default (desa, pendamping, dll)
     const defaultConfig = {
         desa: "Desa Nglebeng",
         kecamatan: "Kecamatan Panggul",
@@ -254,10 +254,10 @@
         pendamping: "Sukron Hasim, S.Pd",
         nip: "19900217 202521 1 047"
     };
-    let config = { ...defaultConfig };
 
     // ==================== GLOBAL STATE ====================
     let kelompokData = {};
+    let config = {};
     let currentKelompok = "Joketro 1";
     let currentTanggal = "";
     let currentTempat = "";
@@ -266,7 +266,7 @@
     let ttdBase64 = "";
     let devUnlocked = false;
 
-    // Load/save kelompok data
+    // ==================== FUNGSI STORAGE ====================
     function loadKelompokData() {
         const saved = localStorage.getItem("p2k2_kelompokData");
         if (saved) { try { kelompokData = JSON.parse(saved); } catch(e) { kelompokData = JSON.parse(JSON.stringify(defaultKelompokData)); } }
@@ -274,14 +274,11 @@
         saveKelompokData();
     }
     function saveKelompokData() { localStorage.setItem("p2k2_kelompokData", JSON.stringify(kelompokData)); }
-
-    // Load/save config (desa, pendamping, dll)
     function loadConfig() {
         const saved = localStorage.getItem("p2k2_config");
         if (saved) { try { config = JSON.parse(saved); } catch(e) { config = { ...defaultConfig }; } }
         else { config = { ...defaultConfig }; }
         updateHeaderDisplay();
-        // isi form config di menu pengembang
         document.getElementById("configDesa").value = config.desa;
         document.getElementById("configKecamatan").value = config.kecamatan;
         document.getElementById("configKabupaten").value = config.kabupaten;
@@ -301,10 +298,8 @@
     function updateHeaderDisplay() {
         document.getElementById("headerSub").innerHTML = `${config.desa}, ${config.kecamatan}, ${config.kabupaten} | Pendamping: ${config.pendamping} | NIP. ${config.nip}`;
     }
-
     function getAbsenKey() { return `p2k2_absen_${currentKelompok}_${currentTanggal}`; }
     function getUploadKey() { return `p2k2_upload_${currentKelompok}_${currentTanggal}`; }
-    
     function loadAbsenData() {
         if (!currentTanggal) return;
         const saved = localStorage.getItem(getAbsenKey());
@@ -322,7 +317,6 @@
         updatePreview();
     }
     function saveUploadData() { localStorage.setItem(getUploadKey(), JSON.stringify({ bukti: buktiBase64, ttd: ttdBase64 })); }
-    
     function updatePreview() {
         const pb = document.getElementById("previewBukti");
         if (buktiBase64) { pb.innerHTML = `<img src="${buktiBase64}" style="max-width:120px; max-height:80px;"><br>`; document.getElementById("clearBuktiBtn").style.display = "inline-block"; }
@@ -332,10 +326,10 @@
         else { pt.innerHTML = ""; document.getElementById("clearTtdBtn").style.display = "none"; }
     }
 
-    // Render tabel utama
+    // ==================== RENDER TABEL & UI ====================
     function renderTable() {
         const daftar = kelompokData[currentKelompok] || [];
-        if (!daftar.length) { document.getElementById("absenBody").innerHTML = '<td><td colspan="5">Kelompok kosong</td></tr>'; updateSummary(); return; }
+        if (!daftar.length) { document.getElementById("absenBody").innerHTML = '<tr><td colspan="5">Kelompok kosong</td></tr>'; updateSummary(); return; }
         let html = '';
         daftar.forEach((nama, idx) => {
             const state = absenState[nama] || { status: "hadir", alasan: "" };
@@ -347,7 +341,7 @@
                 <td>${escapeHtml(nama)}</td>
                 <td><span class="${statusClass}">${statusText}</span></td>
                 <td>${alasanInput}</td>
-                <td><button class="hadir-btn" data-nama="${escapeHtml(nama)}" data-status="hadir">HADIR</button> <button class="tidak-btn" data-nama="${escapeHtml(nama)}" data-status="tidak">TIDAK</button></td>
+                <td><button class="hadir-btn" data-nama="${escapeHtml(nama)}">HADIR</button> <button class="tidak-btn" data-nama="${escapeHtml(nama)}">TIDAK</button></td>
             </tr>`;
         });
         document.getElementById("absenBody").innerHTML = html;
@@ -371,14 +365,12 @@
         const persen = total ? Math.round(hadir/total*100) : 0;
         document.getElementById("summaryArea").innerHTML = `📊 Total KPM: ${total} | ✅ Hadir: ${hadir} | ❌ Tidak: ${tidak} | 📈 Persentase: ${persen}%`;
     }
-
     function populateKelompokSelect() {
         const sel = document.getElementById("kelompokSelect");
         sel.innerHTML = "";
         Object.keys(kelompokData).forEach(k => sel.appendChild(new Option(k, k)));
-        // juga untuk dropdown di menu pengembang
-        const selects = ['renameKelompokSelect', 'tambahKelompokSelect', 'gantiKelompokSelect', 'hapusKelompokSelect', 'resetKelompokSelect'];
-        selects.forEach(id => {
+        const devSelects = ['renameKelompokSelect', 'tambahKelompokSelect', 'gantiKelompokSelect', 'hapusKelompokSelect', 'resetKelompokSelect'];
+        devSelects.forEach(id => {
             let s = document.getElementById(id);
             if (s) { s.innerHTML = ""; Object.keys(kelompokData).forEach(k => s.appendChild(new Option(k, k))); }
         });
@@ -398,8 +390,133 @@
             kelompokData[hapusKel].forEach(k => sel.appendChild(new Option(k, k)));
         }
     }
+    function loadFromForm() {
+        currentKelompok = document.getElementById("kelompokSelect").value;
+        currentTanggal = document.getElementById("tanggalInput").value;
+        currentTempat = document.getElementById("tempatInput").value;
+        if (!currentTanggal) { alert("Pilih tanggal"); return false; }
+        loadAbsenData(); loadUploadData(); renderTable(); return true;
+    }
+    function resetAllHadir() {
+        if (!confirm(`Reset semua ke HADIR untuk ${currentKelompok} tanggal ${currentTanggal}?`)) return;
+        kelompokData[currentKelompok].forEach(n => { absenState[n] = { status: "hadir", alasan: "" }; });
+        saveAbsenData(); renderTable(); alert("Reset selesai");
+    }
 
-    // Fungsi untuk menu pengembang
+    // ==================== EKSPORT IMPORT CSV (MASTER DATA) ====================
+    function exportMasterCSV() {
+        let rows = [];
+        rows.push("#KONFIGURASI");
+        rows.push("desa,kecamatan,kabupaten,pendamping,nip");
+        rows.push(`"${config.desa}","${config.kecamatan}","${config.kabupaten}","${config.pendamping}","${config.nip}"`);
+        rows.push("#KELOMPOK");
+        rows.push("Nama Kelompok,Nama KPM");
+        for (const [kel, daftar] of Object.entries(kelompokData)) {
+            for (const kpm of daftar) {
+                rows.push(`"${kel}","${kpm}"`);
+            }
+        }
+        const csvContent = rows.join("\n");
+        downloadFile(csvContent, `master_p2k2_${new Date().toISOString().slice(0,19)}.csv`, "text/csv;charset=utf-8;");
+    }
+    function importMasterCSV(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const text = e.target.result;
+                const lines = text.split(/\r?\n/);
+                let mode = null;
+                let newConfig = null;
+                let newKelompok = {};
+                for (let line of lines) {
+                    line = line.trim();
+                    if (line === "") continue;
+                    if (line === "#KONFIGURASI") { mode = "config"; continue; }
+                    if (line === "#KELOMPOK") { mode = "kelompok"; continue; }
+                    if (mode === "config") {
+                        if (line.startsWith("desa")) continue;
+                        let parts = parseCSVLine(line);
+                        if (parts.length >= 5) {
+                            newConfig = {
+                                desa: parts[0].replace(/^"|"$/g, ''),
+                                kecamatan: parts[1].replace(/^"|"$/g, ''),
+                                kabupaten: parts[2].replace(/^"|"$/g, ''),
+                                pendamping: parts[3].replace(/^"|"$/g, ''),
+                                nip: parts[4].replace(/^"|"$/g, '')
+                            };
+                        }
+                        mode = null;
+                    } else if (mode === "kelompok") {
+                        if (line.startsWith("Nama Kelompok")) continue;
+                        let parts = parseCSVLine(line);
+                        if (parts.length >= 2) {
+                            let kel = parts[0].replace(/^"|"$/g, '');
+                            let kpm = parts[1].replace(/^"|"$/g, '');
+                            if (!newKelompok[kel]) newKelompok[kel] = [];
+                            if (!newKelompok[kel].includes(kpm)) newKelompok[kel].push(kpm);
+                        }
+                    }
+                }
+                if (newConfig) { config = newConfig; localStorage.setItem("p2k2_config", JSON.stringify(config)); updateHeaderDisplay(); }
+                if (Object.keys(newKelompok).length) {
+                    kelompokData = newKelompok;
+                    saveKelompokData();
+                    // Hapus data absen lama karena struktur berubah
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key.startsWith("p2k2_absen_") || key.startsWith("p2k2_upload_")) localStorage.removeItem(key);
+                    }
+                    populateKelompokSelect();
+                    if (!kelompokData[currentKelompok]) currentKelompok = Object.keys(kelompokData)[0];
+                    document.getElementById("kelompokSelect").value = currentKelompok;
+                    loadAbsenData(); loadUploadData(); renderTable();
+                }
+                showMsg("✅ Import master CSV berhasil!");
+            } catch(err) { alert("Gagal import CSV: " + err.message); }
+        };
+        reader.readAsText(file);
+    }
+    function parseCSVLine(line) {
+        const regex = /(?:,|^)(?:"([^"]*(?:""[^"]*)*)"|([^",]*))/g;
+        let values = [], match;
+        while ((match = regex.exec(line)) !== null) values.push(match[1] !== undefined ? match[1].replace(/""/g, '"') : (match[2] || ''));
+        return values;
+    }
+    function downloadFile(content, filename, mime) {
+        const blob = new Blob(["\uFEFF" + content], {type: mime});
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+    // ==================== FULL BACKUP JSON ====================
+    function exportFullBackup() {
+        let all = {};
+        for (let i = 0; i < localStorage.length; i++) { let k = localStorage.key(i); all[k] = localStorage.getItem(k); }
+        let dataStr = JSON.stringify(all, null, 2);
+        downloadFile(dataStr, `fullbackup_p2k2_${new Date().toISOString().slice(0,19)}.json`, "application/json");
+    }
+    function importFullBackup(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                let imported = JSON.parse(e.target.result);
+                for (let [k, v] of Object.entries(imported)) localStorage.setItem(k, v);
+                showMsg("✅ Full backup berhasil diimport. Halaman akan refresh...");
+                setTimeout(() => location.reload(), 1500);
+            } catch(err) { alert("File backup tidak valid"); }
+        };
+        reader.readAsText(file);
+    }
+    function showMsg(msg) {
+        let el = document.getElementById("importMsg");
+        el.innerHTML = msg;
+        el.style.display = "block";
+        setTimeout(() => el.style.display = "none", 3000);
+    }
+
+    // ==================== MENU PENGEMBANG (MANAJEMEN KELOMPOK) ====================
     function renameKelompok() {
         let old = document.getElementById('renameKelompokSelect').value;
         let newName = document.getElementById('newKelompokName').value.trim();
@@ -494,79 +611,8 @@
         loadAbsenData(); loadUploadData(); renderTable();
         alert("Semua data direset");
     }
-    function exportBackup() {
-        let all = {};
-        for (let i = 0; i < localStorage.length; i++) { let k = localStorage.key(i); all[k] = localStorage.getItem(k); }
-        let dataStr = JSON.stringify(all, null, 2);
-        let blob = new Blob([dataStr], {type: "application/json"});
-        let url = URL.createObjectURL(blob);
-        let a = document.createElement('a');
-        a.href = url; a.download = `p2k2_backup_${new Date().toISOString().slice(0,19)}.json`;
-        a.click(); URL.revokeObjectURL(url);
-    }
-    function importBackup(file) {
-        let reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                let imported = JSON.parse(e.target.result);
-                for (let [k, v] of Object.entries(imported)) localStorage.setItem(k, v);
-                document.getElementById("importMsg").innerHTML = "✅ Import berhasil! Refresh halaman...";
-                document.getElementById("importMsg").style.display = "block";
-                setTimeout(() => location.reload(), 1500);
-            } catch(err) { alert("File tidak valid"); }
-        };
-        reader.readAsText(file);
-    }
 
-    // Lock / kunci menu pengembang
-    function lockDevMenu() {
-        devUnlocked = false;
-        document.getElementById("devPanel").classList.remove("show");
-        alert("Menu Pengembang terkunci. Klik 'Menu Pengembang' lagi untuk membuka dengan password.");
-    }
-
-    // ==================== LOAD DATA AWAL ====================
-    function loadFromForm() {
-        currentKelompok = document.getElementById("kelompokSelect").value;
-        currentTanggal = document.getElementById("tanggalInput").value;
-        currentTempat = document.getElementById("tempatInput").value;
-        if (!currentTanggal) { alert("Pilih tanggal"); return false; }
-        loadAbsenData();
-        loadUploadData();
-        renderTable();
-        return true;
-    }
-
-    function resetAllHadir() {
-        if (!confirm(`Reset semua ke HADIR untuk ${currentKelompok} tanggal ${currentTanggal}?`)) return;
-        kelompokData[currentKelompok].forEach(n => { absenState[n] = { status: "hadir", alasan: "" }; });
-        saveAbsenData(); renderTable(); alert("Reset selesai");
-    }
-
-    // Export PDF, Word, Excel (menggunakan konfigurasi yang sudah disimpan)
-    function exportReport(format) {
-        if (!currentTanggal) { alert("Muat data dulu"); return; }
-        let html = generateReportHTML();
-        if (format === 'excel') {
-            let csv = convertToCSV();
-            let blob = new Blob(["\uFEFF" + csv], {type: "text/csv;charset=utf-8;"});
-            let a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `absen_${currentKelompok}_${currentTanggal}.csv`;
-            a.click(); URL.revokeObjectURL(a.href);
-        } else if (format === 'pdf') {
-            let element = document.createElement('div');
-            element.innerHTML = html;
-            document.body.appendChild(element);
-            html2pdf().set({ margin: [0.8,0.8,0.8,0.8], filename: `absen_${currentKelompok}_${currentTanggal}.pdf`, jsPDF: { unit: 'cm', format: 'f4', orientation: 'portrait' } }).from(element).save().then(() => document.body.removeChild(element));
-        } else if (format === 'word') {
-            let blob = new Blob([html], {type: "application/msword"});
-            let a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `absen_${currentKelompok}_${currentTanggal}.doc`;
-            a.click(); URL.revokeObjectURL(a.href);
-        }
-    }
+    // ==================== EXPORT LAPORAN (PDF/WORD/EXCEL) ====================
     function generateReportHTML() {
         let kelompok = currentKelompok, tanggal = currentTanggal, tempat = currentTempat;
         let daftar = kelompokData[kelompok] || [];
@@ -588,25 +634,37 @@
         <div style="margin-top:40px; text-align:right">Panggul, ${tanggal}<br>ASN/PPPK Pendamping Sosial<br>${ttdImg}<strong>${config.pendamping}</strong><br>NIP. ${config.nip}</div>
         </body></html>`;
     }
+    function exportLaporan(format) {
+        if (!currentTanggal) { alert("Muat data dulu"); return; }
+        let html = generateReportHTML();
+        if (format === 'excel') {
+            let csv = convertToCSV();
+            downloadFile(csv, `absen_${currentKelompok}_${currentTanggal}.csv`, "text/csv;charset=utf-8;");
+        } else if (format === 'pdf') {
+            let element = document.createElement('div');
+            element.innerHTML = html;
+            document.body.appendChild(element);
+            html2pdf().set({ margin: [0.8,0.8,0.8,0.8], filename: `absen_${currentKelompok}_${currentTanggal}.pdf`, jsPDF: { unit: 'cm', format: 'f4', orientation: 'portrait' } }).from(element).save().then(() => document.body.removeChild(element));
+        } else if (format === 'word') {
+            downloadFile(html, `absen_${currentKelompok}_${currentTanggal}.doc`, "application/msword");
+        }
+    }
     function convertToCSV() {
         let kelompok = currentKelompok, tanggal = currentTanggal, tempat = currentTempat;
         let daftar = kelompokData[kelompok] || [];
-        let rows = [["DAFTAR HADIR KPM"],["PKH "+config.desa+", "+config.kecamatan+", "+config.kabupaten],["KELOMPOK "+kelompok],["Tanggal: "+tanggal],["Tempat: "+tempat],["Jumlah Hadir: "+daftar.filter(n=>(absenState[n]?.status||"hadir")==="hadir").length," Tidak Hadir: "+daftar.filter(n=>(absenState[n]?.status||"hadir")!=="hadir").length],[]];
+        let rows = [["DAFTAR HADIR KPM"],["PKH "+config.desa+", "+config.kecamatan+", "+config.kabupaten],["KELOMPOK "+kelompok],["Tanggal: "+tanggal],["Tempat: "+tempat]];
+        let hadir = daftar.filter(n=>(absenState[n]?.status||"hadir")==="hadir").length;
+        rows.push(["Hadir: "+hadir," Tidak: "+ (daftar.length-hadir)],[]);
         rows.push(["NO","NAMA","STATUS","KETERANGAN"]);
         daftar.forEach((n,i)=>{let s=absenState[n]||{status:"hadir",alasan:""}; rows.push([i+1,n,s.status==="hadir"?"HADIR":"TIDAK HADIR",s.status==="tidak"?s.alasan:"-"]);});
         rows.push([],["Panggul, "+tanggal,"","",""],["ASN/PPPK Pendamping Sosial","","",""],[config.pendamping],["NIP. "+config.nip]);
         return rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
     }
 
-    // Menu pengembang dengan password baru
+    // ==================== PASSWORD & TOGGLE MENU PENGEMBANG ====================
     function toggleDevMenu() {
-        if (!devUnlocked) {
-            showPasswordOverlay();
-        } else {
-            let panel = document.getElementById("devPanel");
-            if (panel.classList.contains("show")) panel.classList.remove("show");
-            else panel.classList.add("show");
-        }
+        if (!devUnlocked) showPasswordOverlay();
+        else document.getElementById("devPanel").classList.toggle("show");
     }
     function showPasswordOverlay() {
         let overlay = document.createElement('div');
@@ -614,14 +672,11 @@
         overlay.innerHTML = `<div class="password-box"><h3>🔒 Menu Pengembang</h3><input type="password" id="passInput" placeholder="Password"><br><br><button id="passSubmit">Buka</button><button id="passCancel" style="margin-left:10px;">Batal</button><div id="passErr" style="color:red;margin-top:8px;"></div></div>`;
         document.body.appendChild(overlay);
         document.getElementById('passSubmit').onclick = () => {
-            let pass = document.getElementById('passInput').value;
-            if (pass === "sukronmakasih") {
+            if (document.getElementById('passInput').value === "sukronmakasih") {
                 devUnlocked = true;
                 overlay.remove();
                 document.getElementById("devPanel").classList.add("show");
                 populateKelompokSelect();
-                updateKPMDropdowns();
-                loadConfig(); // refresh form config
             } else {
                 document.getElementById('passErr').innerText = "Password salah!";
             }
@@ -629,20 +684,43 @@
         document.getElementById('passCancel').onclick = () => overlay.remove();
         document.getElementById('passInput').focus();
     }
+    function lockDevMenu() {
+        devUnlocked = false;
+        document.getElementById("devPanel").classList.remove("show");
+        alert("Menu Pengembang terkunci.");
+    }
 
-    // Event handlers upload
-    document.getElementById("uploadBukti").addEventListener('change', (e) => {
-        let f = e.target.files[0];
-        if (f) { let r = new FileReader(); r.onload = (ev) => { buktiBase64 = ev.target.result; updatePreview(); saveUploadData(); }; r.readAsDataURL(f); }
-    });
-    document.getElementById("uploadTtd").addEventListener('change', (e) => {
-        let f = e.target.files[0];
-        if (f) { let r = new FileReader(); r.onload = (ev) => { ttdBase64 = ev.target.result; updatePreview(); saveUploadData(); }; r.readAsDataURL(f); }
-    });
+    // ==================== EVENT HANDLERS ====================
+    document.getElementById("uploadBukti").addEventListener('change', (e) => { if(e.target.files[0]){ let r=new FileReader(); r.onload=(ev)=>{ buktiBase64=ev.target.result; updatePreview(); saveUploadData(); }; r.readAsDataURL(e.target.files[0]); } });
+    document.getElementById("uploadTtd").addEventListener('change', (e) => { if(e.target.files[0]){ let r=new FileReader(); r.onload=(ev)=>{ ttdBase64=ev.target.result; updatePreview(); saveUploadData(); }; r.readAsDataURL(e.target.files[0]); } });
     document.getElementById("clearBuktiBtn").onclick = () => { buktiBase64 = ""; document.getElementById("uploadBukti").value = ""; updatePreview(); saveUploadData(); };
     document.getElementById("clearTtdBtn").onclick = () => { ttdBase64 = ""; document.getElementById("uploadTtd").value = ""; updatePreview(); saveUploadData(); };
+    document.getElementById("loadBtn").onclick = loadFromForm;
+    document.getElementById("simpanBtn").onclick = () => { saveAbsenData(); saveUploadData(); alert("Data tersimpan!"); };
+    document.getElementById("resetBtn").onclick = resetAllHadir;
+    document.getElementById("exportBtn").onclick = () => exportLaporan(document.getElementById("exportFormat").value);
+    document.getElementById("devBtn").onclick = toggleDevMenu;
+    document.getElementById("saveConfigBtn").onclick = saveConfig;
+    document.getElementById("lockDevBtn").onclick = lockDevMenu;
+    // Export/Import Master CSV
+    document.getElementById("exportMasterBtn").onclick = exportMasterCSV;
+    document.getElementById("importMasterBtn").onclick = () => document.getElementById("importMasterFile").click();
+    document.getElementById("importMasterFile").onchange = (e) => { if(e.target.files[0]) importMasterCSV(e.target.files[0]); e.target.value=""; };
+    // Export/Import Full JSON
+    document.getElementById("exportFullBtn").onclick = exportFullBackup;
+    document.getElementById("importFullBtn").onclick = () => document.getElementById("importFullFile").click();
+    document.getElementById("importFullFile").onchange = (e) => { if(e.target.files[0]) importFullBackup(e.target.files[0]); e.target.value=""; };
+    // Event untuk dropdown di menu pengembang
+    document.getElementById("renameKelompokBtn").onclick = renameKelompok;
+    document.getElementById("tambahKPMBtn").onclick = tambahKPM;
+    document.getElementById("gantiKPMBtn").onclick = gantiKPM;
+    document.getElementById("hapusKPMBtn").onclick = hapusKPM;
+    document.getElementById("resetKelompokBtn").onclick = resetKelompok;
+    document.getElementById("resetSemuaBtn").onclick = resetSemua;
+    document.getElementById("gantiKelompokSelect").onchange = updateKPMDropdowns;
+    document.getElementById("hapusKelompokSelect").onchange = updateKPMDropdowns;
 
-    // Inisialisasi
+    // ==================== INIT ====================
     loadKelompokData();
     loadConfig();
     populateKelompokSelect();
@@ -655,26 +733,6 @@
     loadAbsenData();
     loadUploadData();
     renderTable();
-
-    document.getElementById("loadBtn").addEventListener('click', loadFromForm);
-    document.getElementById("simpanBtn").addEventListener('click', () => { saveAbsenData(); saveUploadData(); alert("Data tersimpan!"); });
-    document.getElementById("resetBtn").addEventListener('click', resetAllHadir);
-    document.getElementById("exportBtn").addEventListener('click', () => exportReport(document.getElementById("exportFormat").value));
-    document.getElementById("devBtn").addEventListener('click', toggleDevMenu);
-    document.getElementById("saveConfigBtn").addEventListener('click', saveConfig);
-    document.getElementById("lockDevBtn").addEventListener('click', lockDevMenu);
-    // Menu pengembang actions
-    document.getElementById("renameKelompokBtn").addEventListener('click', renameKelompok);
-    document.getElementById("tambahKPMBtn").addEventListener('click', tambahKPM);
-    document.getElementById("gantiKPMBtn").addEventListener('click', gantiKPM);
-    document.getElementById("hapusKPMBtn").addEventListener('click', hapusKPM);
-    document.getElementById("resetKelompokBtn").addEventListener('click', resetKelompok);
-    document.getElementById("resetSemuaBtn").addEventListener('click', resetSemua);
-    document.getElementById("exportDataBtn").addEventListener('click', exportBackup);
-    document.getElementById("importDataBtn").addEventListener('click', () => document.getElementById("importFile").click());
-    document.getElementById("importFile").addEventListener('change', (e) => { if(e.target.files[0]) importBackup(e.target.files[0]); });
-    document.getElementById("gantiKelompokSelect").addEventListener('change', updateKPMDropdowns);
-    document.getElementById("hapusKelompokSelect").addEventListener('change', updateKPMDropdowns);
 </script>
 </body>
 </html>
